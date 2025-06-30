@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF14 宇宙合建天气预报</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: url('https://ff14.xin/static/宇宙探索.jpg') center/cover fixed;
+            min-height: 100vh;
+            color: #fff;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 20, 0.7);
+            z-index: -1;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .title {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 3s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin: 20px;
+            flex-wrap: wrap;
+        }
+
+        .datacenter-select {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .datacenter-select:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .datacenter-select option {
+            background: #2c3e50;
+            color: #fff;
+        }
+
+
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .server-card {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .server-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .server-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.2;
+            z-index: -1;
+        }
+
+        .server-card.has-mecha-starting::before {
+            background-image: url('https://ff14.xin/static/机甲.jpg');
+        }
+
+        .server-card.has-mecha-other::before {
+            background-image: url('https://ff14.xin/static/机甲2.jpg');
+        }
+
+        .server-card.has-null-message::before {
+            background-image: url('https://ff14.xin/static/常态.jpg');
+        }
+
+        .server-card.has-emergency::before {
+            background-image: url('https://ff14.xin/static/紧急任务.jpg');
+        }
+
+        .server-card.has-joint-project::before {
+            background-image: url('https://ff14.xin/static/联合.jpg');
+        }
+
+        .server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .server-name {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+
+        .weather-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+
+        .weather-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .weather-id {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .emergency-status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .emergency-true {
+            background: #ff4757;
+            color: #fff;
+        }
+
+                 .emergency-false {
+             background: #2ed573;
+             color: #fff;
+         }
+
+         .emergency-preview {
+             background: #ff9f43;
+             color: #fff;
+         }
+
+         .joint-project {
+             background: #3742fa;
+             color: #fff;
+         }
+
+        .message {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .progress-section {
+            margin: 15px 0;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ffd700, #4ecdc4);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .timestamp-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .timestamp {
+            color: #ffd700;
+        }
+
+        .update-time-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.8em;
+            color: #999;
+            text-align: center;
+        }
+
+        .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #ff4757;
+            font-size: 18px;
+        }
+
+        .stats {
+            text-align: center;
+            margin: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .instance-count {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .servers-grid {
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .title {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">FF14 宇宙合建天气预报</h1>
+        <div class="controls">
+            <select class="datacenter-select" id="datacenterSelect">
+                <option value="">选择数据中心</option>
+                <option value="陆行鸟">陆行鸟</option>
+                <option value="莫古力">莫古力</option>
+                <option value="猫小胖">猫小胖</option>
+                <option value="豆豆柴">豆豆柴</option>
+                <option value="Elemental">Elemental</option>
+                <option value="Gaia">Gaia</option>
+                <option value="Mana">Mana</option>
+                <option value="Aether">Aether</option>
+                <option value="Primal">Primal</option>
+                <option value="Chaos">Chaos</option>
+                <option value="Light">Light</option>
+                <option value="Crystal">Crystal</option>
+                <option value="Materia">Materia</option>
+                <option value="Meteor">Meteor</option>
+                <option value="Dynamis">Dynamis</option>
+                <option value="한국">한국</option>
+            </select>
+
+        </div>
+    </div>
+
+    <div id="loadingDiv" class="loading" style="display: none;">
+        🌙 正在获取宇宙合建数据...
+    </div>
+
+    <div id="statsDiv" class="stats" style="display: none;"></div>
+
+    <div id="serversGrid" class="servers-grid"></div>
+
+    <div id="errorDiv" class="error-message" style="display: none;"></div>
+
+    <script>
+        
+        const servers = [
+            { "id": 21, "name": "Ravana" }, { "id": 22, "name": "Bismarck" }, { "id": 23, "name": "Asura" }, { "id": 24, "name": "Belias" }, { "id": 28, "name": "Pandaemonium" },
+            { "id": 29, "name": "Shinryu" }, { "id": 30, "name": "Unicorn" }, { "id": 31, "name": "Yojimbo" }, { "id": 32, "name": "Zeromus" }, { "id": 33, "name": "Twintania" },
+            { "id": 34, "name": "Brynhildr" }, { "id": 35, "name": "Famfrit" }, { "id": 36, "name": "Lich" }, { "id": 37, "name": "Mateus" }, { "id": 39, "name": "Omega" },
+            { "id": 40, "name": "Jenova" }, { "id": 41, "name": "Zalera" }, { "id": 42, "name": "Zodiark" }, { "id": 43, "name": "Alexander" }, { "id": 44, "name": "Anima" },
+            { "id": 45, "name": "Carbuncle" }, { "id": 46, "name": "Fenrir" }, { "id": 47, "name": "Hades" }, { "id": 48, "name": "Ixion" }, { "id": 49, "name": "Kujata" },
+            { "id": 50, "name": "Typhon" }, { "id": 51, "name": "Ultima" }, { "id": 52, "name": "Valefor" }, { "id": 53, "name": "Exodus" }, { "id": 54, "name": "Faerie" },
+            { "id": 55, "name": "Lamia" }, { "id": 56, "name": "Phoenix" }, { "id": 57, "name": "Siren" }, { "id": 58, "name": "Garuda" }, { "id": 59, "name": "Ifrit" },
+            { "id": 60, "name": "Ramuh" }, { "id": 61, "name": "Titan" }, { "id": 62, "name": "Diabolos" }, { "id": 63, "name": "Gilgamesh" }, { "id": 64, "name": "Leviathan" },
+            { "id": 65, "name": "Midgardsormr" }, { "id": 66, "name": "Odin" }, { "id": 67, "name": "Shiva" }, { "id": 68, "name": "Atomos" }, { "id": 69, "name": "Bahamut" },
+            { "id": 70, "name": "Chocobo" }, { "id": 71, "name": "Moogle" }, { "id": 72, "name": "Tonberry" }, { "id": 73, "name": "Adamantoise" }, { "id": 74, "name": "Coeurl" },
+            { "id": 75, "name": "Malboro" }, { "id": 76, "name": "Tiamat" }, { "id": 77, "name": "Ultros" }, { "id": 78, "name": "Behemoth" }, { "id": 79, "name": "Cactuar" },
+            { "id": 80, "name": "Cerberus" }, { "id": 81, "name": "Goblin" }, { "id": 82, "name": "Mandragora" }, { "id": 83, "name": "Louisoix" }, { "id": 85, "name": "Spriggan" },
+            { "id": 86, "name": "Sephirot" }, { "id": 87, "name": "Sophia" }, { "id": 88, "name": "Zurvan" }, { "id": 90, "name": "Aegis" }, { "id": 91, "name": "Balmung" },
+            { "id": 92, "name": "Durandal" }, { "id": 93, "name": "Excalibur" }, { "id": 94, "name": "Gungnir" }, { "id": 95, "name": "Hyperion" }, { "id": 96, "name": "Masamune" },
+            { "id": 97, "name": "Ragnarok" }, { "id": 98, "name": "Ridill" }, { "id": 99, "name": "Sargatanas" }, { "id": 400, "name": "Sagittarius" }, { "id": 401, "name": "Phantom" },
+            { "id": 402, "name": "Alpha" }, { "id": 403, "name": "Raiden" }, { "id": 404, "name": "Marilith" }, { "id": 405, "name": "Seraph" }, { "id": 406, "name": "Halicarnassus" },
+            { "id": 407, "name": "Maduin" }, { "id": 408, "name": "Cuchulainn" }, { "id": 409, "name": "Kraken" }, { "id": 410, "name": "Rafflesia" }, { "id": 411, "name": "Golem" },
+            { "id": 3000, "name": "Cloudtest01" }, { "id": 3001, "name": "Cloudtest02" }, { "id": 1167, "name": "红玉海" }, { "id": 1081, "name": "神意之地" }, { "id": 1042, "name": "拉诺西亚" },
+            { "id": 1044, "name": "幻影群岛" }, { "id": 1060, "name": "萌芽池" }, { "id": 1173, "name": "宇宙和音" }, { "id": 1174, "name": "沃仙曦染" }, { "id": 1175, "name": "晨曦王座" },
+            { "id": 1172, "name": "白银乡" }, { "id": 1076, "name": "白金幻象" }, { "id": 1171, "name": "神拳痕" }, { "id": 1170, "name": "潮风亭" }, { "id": 1113, "name": "旅人栈桥" },
+            { "id": 1121, "name": "拂晓之间" }, { "id": 1166, "name": "龙巢神殿" }, { "id": 1176, "name": "梦羽宝境" }, { "id": 1043, "name": "紫水栈桥" }, { "id": 1169, "name": "延夏" },
+            { "id": 1106, "name": "静语庄园" }, { "id": 1045, "name": "摩杜纳" }, { "id": 1177, "name": "海猫茶屋" }, { "id": 1178, "name": "柔风海湾" }, { "id": 1179, "name": "琥珀原" },
+            { "id": 1192, "name": "水晶塔" }, { "id": 1183, "name": "银泪湖" }, { "id": 1180, "name": "太阳海岸" }, { "id": 1186, "name": "伊修加德" }, { "id": 1201, "name": "红茶川" },
+            { "id": 1068, "name": "黄金谷" }, { "id": 1064, "name": "月牙湾" }, { "id": 1187, "name": "雪松原" }, { "id": 2075, "name": "카벙클" }, { "id": 2076, "name": "초코보" },
+            { "id": 2077, "name": "모그리" }, { "id": 2078, "name": "톤베리" }, { "id": 2080, "name": "펜리르" }
+        ];
+
+        const datacenters = [
+            { "name": "Elemental", "region": "Japan", "worlds": [45, 49, 50, 58, 68, 72, 90, 94] },
+            { "name": "Gaia", "region": "Japan", "worlds": [43, 46, 51, 59, 69, 76, 92, 98] },
+            { "name": "Mana", "region": "Japan", "worlds": [23, 28, 44, 47, 48, 61, 70, 96] },
+            { "name": "Aether", "region": "North-America", "worlds": [40, 54, 57, 63, 65, 73, 79, 99] },
+            { "name": "Primal", "region": "North-America", "worlds": [35, 53, 55, 64, 77, 78, 93, 95] },
+            { "name": "Chaos", "region": "Europe", "worlds": [39, 71, 80, 83, 85, 97, 400, 401] },
+            { "name": "Light", "region": "Europe", "worlds": [33, 36, 42, 56, 66, 67, 402, 403] },
+            { "name": "Crystal", "region": "North-America", "worlds": [34, 37, 41, 62, 74, 75, 81, 91] },
+            { "name": "Materia", "region": "Oceania", "worlds": [21, 22, 86, 87, 88] },
+            { "name": "Meteor", "region": "Japan", "worlds": [24, 29, 30, 31, 32, 52, 60, 82] },
+            { "name": "Dynamis", "region": "North-America", "worlds": [404, 405, 406, 407, 408, 409, 410, 411] },
+            { "name": "NA Cloud DC (Beta)", "region": "NA-Cloud-DC", "worlds": [3000, 3001] },
+            { "name": "陆行鸟", "region": "中国", "worlds": [1167, 1081, 1042, 1044, 1060, 1173, 1174, 1175] },
+            { "name": "莫古力", "region": "中国", "worlds": [1172, 1076, 1171, 1170, 1113, 1121, 1166, 1176] },
+            { "name": "猫小胖", "region": "中国", "worlds": [1043, 1169, 1106, 1045, 1177, 1178, 1179] },
+            { "name": "豆豆柴", "region": "中国", "worlds": [1192, 1183, 1180, 1186, 1201, 1068, 1064, 1187] },
+            { "name": "한국", "region": "한국", "worlds": [2075, 2076, 2077, 2078, 2080] }
+        ];
+
+                 
+         const weatherImages = {
+             149: 'https://ff14.xin/static/060237_hr1.png', 
+             194: 'https://ff14.xin/static/060241_hr1.png', 
+             195: 'https://ff14.xin/static/060241_hr1.png', 
+             196: 'https://ff14.xin/static/060237_hr1.png', 
+             197: 'https://ff14.xin/static/060242_hr1.png', 
+             148: 'https://ff14.xin/static/060222_hr1.png', 
+             49: 'https://ff14.xin/static/060219_hr1.png',  
+             2: 'https://ff14.xin/static/060202_hr1.png'    
+         };
+
+        
+        const weatherNames = {
+            149: '磁暴',
+            194: '流星雨',
+            195: '流星雨',
+            196: '磁暴', 
+            197: '孢子雾',
+            
+            148: '月尘',
+            49: '灵风',
+            2: '晴朗'
+        };
+
+        
+        function getServerName(serverId) {
+            const server = servers.find(s => s.id === parseInt(serverId));
+            return server ? server.name : `服务器${serverId}`;
+        }
+
+        
+        function formatTimestamp(timestamp) {
+            const date = new Date(parseInt(timestamp) * 1000);
+            return date.toLocaleString('zh-CN');
+        }
+
+        
+        function formatUpdatedAt(isoString) {
+            if (!isoString) return '未知';
+            const date = new Date(isoString);
+            return date.toLocaleString('zh-CN');
+        }
+
+        
+        function calculateProgress(progress) {
+            const maxProgress = 25700;
+            const percentage = Math.min((parseInt(progress) / maxProgress) * 100, 100);
+            return percentage;
+        }
+
+        
+        function getWeatherIcon(weatherId) {
+            return weatherImages[weatherId] || 'https://ff14.xin/static/060202_hr1.png';
+        }
+
+        
+        function getWeatherName(weatherId) {
+            return weatherNames[weatherId] || `天气${weatherId}`;
+        }
+
+                 
+         function getCardClass(message, taskTypeName) {
+             if (!message || message === null || message === 'null') {
+                 return 'has-null-message'; 
+             } else if (message.includes('机甲')) {
+                 if (message.includes('机甲行动即将开始')) {
+                     return 'has-mecha-starting'; 
+                 } else {
+                     return 'has-mecha-other'; 
+                 }
+             } else if (taskTypeName === '联合工程') {
+                 return 'has-joint-project'; 
+             } else {
+                 return 'has-emergency'; 
+             }
+         }
+
+         
+         function isEmergencyWeather(weatherId) {
+             return [149,194,195, 196, 197].includes(parseInt(weatherId));
+         }
+
+         
+         function isEmergencyPreview(message) {
+             if (!message || message === null || message === 'null') {
+                 return false;
+             }
+             return message.includes('陨石') || message.includes('孢子') || message.includes('磁暴');
+         }
+
+         
+         function getTaskTypeName(message, weatherId) {
+             if (!message || message === null || message === 'null') {
+                 return '暂无任务';
+             } else if (message.includes('机甲')) {
+                 return '机甲任务';
+             } else if (isEmergencyWeather(weatherId)) {
+                 return '紧急任务';
+             } else if (isEmergencyPreview(message)) {
+                 return '紧急任务预告中';
+             } else {
+                 return '联合工程';
+             }
+         }
+
+                         
+        function createServerCard(serverId, data, metadata = null) {
+            const serverName = getServerName(serverId);
+            
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                return `
+                    <div class="server-card">
+                        <div class="server-header">
+                            <div class="server-name">${serverName}</div>
+                        </div>
+                        <div class="message">暂无数据</div>
+                    </div>
+                `;
+            }
+
+             
+             const instance = data[0];
+             const weatherIcon = getWeatherIcon(instance.weather_id);
+             const weatherName = getWeatherName(instance.weather_id);
+             const progressPercentage = calculateProgress(instance.progress);
+             const timestampText = formatTimestamp(instance.timestamp);
+             
+             
+             const taskTypeName = getTaskTypeName(instance.message, instance.weather_id);
+             const cardClass = getCardClass(instance.message, taskTypeName);
+             const isEmergency = isEmergencyWeather(instance.weather_id);
+             const shouldShowProgress = isEmergency;
+             
+             const timeLabel = isEmergency ? '到期时间' : '开始时间';
+             
+             
+             let emergencyClass, emergencyText;
+             if (taskTypeName === '机甲任务') {
+                 emergencyClass = 'emergency-false';
+                 emergencyText = '机甲任务';
+             } else if (taskTypeName === '紧急任务') {
+                 emergencyClass = 'emergency-true';
+                 emergencyText = '紧急任务';
+             } else if (taskTypeName === '紧急任务预告中') {
+                 emergencyClass = 'emergency-preview';
+                 emergencyText = '紧急任务预告中';
+             } else if (taskTypeName === '联合工程') {
+                 emergencyClass = 'joint-project';
+                 emergencyText = '联合工程';
+             } else {
+                 emergencyClass = 'emergency-false';
+                 emergencyText = '暂无任务';
+             }
+
+             
+             const progressHtml = shouldShowProgress ? `
+                 <div class="progress-section">
+                     <div class="progress-label">
+                         <span>进度</span>
+                         <span>${instance.progress}/25700 (${progressPercentage.toFixed(1)}%)</span>
+                     </div>
+                     <div class="progress-bar">
+                         <div class="progress-fill" style="width: ${progressPercentage}%"></div>
+                     </div>
+                 </div>
+             ` : '';
+
+             
+             const shouldShowTime = taskTypeName === '紧急任务' || taskTypeName === '紧急任务预告中';
+             const timestampHtml = shouldShowTime ? `
+                 <div class="timestamp-info">
+                     <span>${timeLabel}:</span>
+                     <span class="timestamp">${timestampText}</span>
+                 </div>
+             ` : '';
+
+             
+             const updatedAtText = metadata && metadata.updated_at ? formatUpdatedAt(metadata.updated_at) : '未知';
+             const updatedAtHtml = `
+                 <div class="update-time-info">
+                     <span>上报时间: ${updatedAtText}</span>
+                 </div>
+             `;
+
+             return `
+                 <div class="server-card ${cardClass}">
+                     <div class="server-header">
+                         <div class="server-name">${serverName}</div>
+                         <img class="weather-icon" src="${weatherIcon}" alt="${weatherName}" title="${weatherName}">
+                     </div>
+                     
+                     <div class="weather-info">
+                         <div class="weather-id">天气: ${weatherName}</div>
+                         <div class="emergency-status ${emergencyClass}">${emergencyText}</div>
+                     </div>
+                     
+                     <div class="message">${instance.message || '暂无消息'}</div>
+                     
+                     ${progressHtml}
+                     
+                     ${timestampHtml}
+                     
+                     ${updatedAtHtml}
+                 </div>
+             `;
+         }
+
+        
+        async function fetchDatacenterData() {
+            const datacenterName = document.getElementById('datacenterSelect').value;
+            if (!datacenterName) {
+                showError('请选择一个数据中心');
+                return;
+            }
+
+            const datacenter = datacenters.find(dc => dc.name === datacenterName);
+            if (!datacenter) {
+                showError('找不到指定的数据中心');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            try {
+                
+                const promises = datacenter.worlds.map(async (serverId) => {
+                    try {
+                        const response = await fetch(`https://wks.ff14.xin/api/data/${serverId}`);
+                        if (response.ok) {
+                            const result = await response.json();
+                            return { serverId, data: result.data, metadata: result.metadata, success: true };
+                        } else {
+                            return { serverId, data: null, metadata: null, success: false, error: response.status };
+                        }
+                    } catch (error) {
+                        return { serverId, data: null, metadata: null, success: false, error: error.message };
+                    }
+                });
+
+                const results = await Promise.all(promises);
+                
+                
+                displayResults(datacenterName, results);
+                
+            } catch (error) {
+                showError(`获取数据时发生错误: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        
+        function displayResults(datacenterName, results) {
+            const serversGrid = document.getElementById('serversGrid');
+            const statsDiv = document.getElementById('statsDiv');
+            
+            const successCount = results.filter(r => r.success).length;
+            const totalCount = results.length;
+            
+            
+            statsDiv.style.display = 'none';
+            
+            
+            const cards = results.map(result => {
+                return createServerCard(result.serverId, result.data, result.metadata);
+            }).join('');
+            
+            serversGrid.innerHTML = cards;
+        }
+
+        
+        function showLoading(show) {
+            document.getElementById('loadingDiv').style.display = show ? 'block' : 'none';
+        }
+
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorDiv');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        
+        function hideError() {
+            document.getElementById('errorDiv').style.display = 'none';
+        }
+
+        
+        document.getElementById('datacenterSelect').addEventListener('change', function() {
+            const selectedValue = this.value;
+            if (selectedValue) {
+                fetchDatacenterData();
+            } else {
+                document.getElementById('serversGrid').innerHTML = '';
+                hideError();
+            }
+        });
+
+        
+        function preloadImages() {
+            const imagesToPreload = [
+                
+                'https://ff14.xin/static/060237_hr1.png',
+                'https://ff14.xin/static/060241_hr1.png',
+                'https://ff14.xin/static/060242_hr1.png',
+                'https://ff14.xin/static/060222_hr1.png',
+                'https://ff14.xin/static/060219_hr1.png',
+                'https://ff14.xin/static/060202_hr1.png',
+                
+                'https://ff14.xin/static/宇宙探索.jpg',
+                'https://ff14.xin/static/机甲.jpg',
+                'https://ff14.xin/static/机甲2.jpg',
+                'https://ff14.xin/static/常态.jpg',
+                'https://ff14.xin/static/紧急任务.jpg',
+                'https://ff14.xin/static/联合.jpg'
+            ];
+
+            imagesToPreload.forEach(imageUrl => {
+                const img = new Image();
+                img.src = imageUrl;
+                
+                
+                
+            });
+
+            console.log('开始预缓存图片，共', imagesToPreload.length, '张图片');
+        }
+
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('FF14 宇宙合建天气预报已加载');
+            
+            preloadImages();
+        });
+    </script>
+</body>
+</html>
